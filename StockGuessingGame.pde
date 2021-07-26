@@ -8,7 +8,13 @@ PriceDataSet priceData;
 int currentGameTick;
 int amountOfPriceDataToDisplay = 100;
 
+int[] testNNconfig = {102,7,3};
+NeuralNetwork testNN;
+
 void setup() {
+    testNN = generateRandomNeuralNetwork(testNNconfig);
+    testNN.print();
+
     //Prepare the game
     priceData = new PriceDataSet("PriceData.txt");
     currentGameTick = 0;
@@ -31,6 +37,7 @@ void draw() {
     //-----------------------------------------------------------------------------------------------------------------------------------------------------
     fill(50);
     rect(0,30,1200,820);
+    //first price in array is the "newest/current price", the last price in the array is the "oldest price"
     float[] tickPriceData = priceData.fetchSubsetOfData(currentGameTick+amountOfPriceDataToDisplay,amountOfPriceDataToDisplay);
 
     //draw each individual price element. First find high and low prices
@@ -47,16 +54,16 @@ void draw() {
             lowPrice = tickPriceData[i];
         }
     }
-    println("highPrice: "+highPrice);
-    println("lowPrice: "+ lowPrice);
+    // println("highPrice: "+highPrice);
+    // println("lowPrice: "+ lowPrice);
 
     //now figure out the pixel scale
     //we have a total of 820 vertical pixels, allow a 10 pixel pad on top and bottom, for a total of 800 usable pixel space
     float deltaPrice = highPrice - lowPrice;
     float pricePerPixel = deltaPrice / 800;
 
-    println("deltaPrice: "+deltaPrice);
-    println("PPP: "+ pricePerPixel);
+    // println("deltaPrice: "+deltaPrice);
+    // println("PPP: "+ pricePerPixel);
 
     //now graph each price point
     int chartStartX = 0;
@@ -75,6 +82,7 @@ void draw() {
     //provide data to AIs and have them make their decisions
     //-----------------------------------------------------------------------------------------------------------------------------------------------------
     
+
     //draw thier choices on the chart
     //-----------------------------------------------------------------------------------------------------------------------------------------------------
 
