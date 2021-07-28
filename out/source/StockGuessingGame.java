@@ -23,6 +23,7 @@ public class StockGuessingGame extends PApplet {
 PriceDataSet priceData;
 int currentGameTick;
 int amountOfPriceDataToDisplay = 100;
+Population aiPopulation;
 
 int[] testNNconfig = {102,7,3};
 NeuralNetwork testNN;
@@ -35,6 +36,9 @@ public void setup() {
     priceData = new PriceDataSet("PriceData.txt");
     currentGameTick = 0;
 
+    //Prepare the AI population
+    aiPopulation = new Population(1000,testNNconfig);
+
     frameRate(60);
     
     background(100);
@@ -42,19 +46,36 @@ public void setup() {
 
 public void draw() {
     //Draw static text
-    //-----------------------------------------------------------------------------------------------------------------------------------------------------
-
+    background(100);
     textSize(14);
     fill(0);
     text("CurrentTick # "+currentGameTick,20,20);
+    text("Current Price: $"+priceData.priceData[currentGameTick+100],200,20);
+
 
 
     //fetch this tick's data and draw it out
-    //-----------------------------------------------------------------------------------------------------------------------------------------------------
     fill(50);
     rect(0,30,1200,820);
     //first price in array is the "newest/current price", the last price in the array is the "oldest price"
     float[] tickPriceData = priceData.fetchSubsetOfData(currentGameTick+amountOfPriceDataToDisplay,amountOfPriceDataToDisplay);
+
+    //feed this tick's worth of data to the AIs and let them make their decisions
+    aiPopulation.runPopulation(tickPriceData);
+
+    //Update the Leaderboard
+    fill(0);
+    line(1300,15,1650,15);
+    line(1300,35,1650,35);
+    line(1300,15,1300,850);
+    text("Index",1305,30);
+    line(1350,15,1350,850);
+    text("USD Spent",1355,30);
+    line(1450,15,1450,850);
+    text("USD Harvest",1455,30);
+    line(1550,15,1550,850);
+    text("Profit",1555,30);
+    line(1650,15,1650,850);
 
     //draw each individual price element. First find high and low prices
     float highPrice = 0;
@@ -72,6 +93,9 @@ public void draw() {
     }
     // println("highPrice: "+highPrice);
     // println("lowPrice: "+ lowPrice);
+    fill(0);
+    text("$"+highPrice,1202,40);
+    text("$"+lowPrice,1202,850);
 
     //now figure out the pixel scale
     //we have a total of 820 vertical pixels, allow a 10 pixel pad on top and bottom, for a total of 800 usable pixel space
@@ -82,29 +106,80 @@ public void draw() {
     // println("PPP: "+ pricePerPixel);
 
     //now graph each price point
-    int chartStartX = 0;
-    for(int i = tickPriceData.length-1; i >= 0; i--)
+    int chartStartX = 1188;
+    for(int i = 0; i <tickPriceData.length; i++)
     {
         //Calculate Y pixel location
         float priceToGraph = highPrice - tickPriceData[i];
         float pixelsFromTop = priceToGraph *(1 / pricePerPixel) + 10 + 30;
 
+        //Draw the price bar
         fill(66, 135, 245);
-        rect(chartStartX,pixelsFromTop,12,3);
+        rect(chartStartX,pixelsFromTop-1,12,3); //the -1 is so the element is vertically centered
 
-        chartStartX += 12;
+        //check the population to see if any historical AI trades have happened on this tick
+        //Buys
+
+        if(i <= currentGameTick) {
+            int totBuys = aiPopulation.totalTickBuys.get(currentGameTick-i);
+            //println("totBuys: "+totBuys);
+            if( totBuys > 0)
+            {
+                fill(255, 148, 25);
+                rect(chartStartX+2,pixelsFromTop+3,8,4*totBuys);
+            }
+            //Sells
+            int totSells = aiPopulation.totalTickSells.get(currentGameTick-i);
+            if(totSells > 0)
+            {
+                fill(31, 242, 116);
+                rect(chartStartX+2,pixelsFromTop-2-4*totSells,8,4*totSells);
+            }
+        }
+
+        chartStartX -= 12;
     }
 
-    //provide data to AIs and have them make their decisions
-    //-----------------------------------------------------------------------------------------------------------------------------------------------------
-    
+    // //now graph each price point
+    // int chartStartX = 0;
+    // for(int i = tickPriceData.length-1; i >= 0; i--)
+    // {
+    //     //Calculate Y pixel location
+    //     float priceToGraph = highPrice - tickPriceData[i];
+    //     float pixelsFromTop = priceToGraph *(1 / pricePerPixel) + 10 + 30;
 
-    //draw thier choices on the chart
-    //-----------------------------------------------------------------------------------------------------------------------------------------------------
+    //     //Draw the price bar
+    //     fill(66, 135, 245);
+    //     rect(chartStartX,pixelsFromTop-1,12,3); //the -1 is so the element is vertically centered
+
+    //     //check the population to see if any historical AI trades have happened on this tick
+    //     //Buys
+    //     int skipOffset = 99-currentGameTick;
+
+    //     if(i >= skipOffset) {
+    //         int totBuys = aiPopulation.totalTickBuys.get(currentGameTick+i-99);
+    //         println("totBuys: "+totBuys);
+    //         if( totBuys > 0)
+    //         {
+    //             fill(255, 148, 25);
+    //             rect(chartStartX+2,pixelsFromTop+3,8,4*aiPopulation.totalTickBuys.get(currentGameTick));
+    //         }
+    //         //Sells
+    //         int totSells = aiPopulation.totalTickSells.get(currentGameTick+i-99);
+    //         if(totSells > 0)
+    //         {
+    //             fill(31, 242, 116);
+    //             rect(chartStartX+2,pixelsFromTop-2-4*totSells,8,4*totSells);
+    //         }
+    //     }
+
+    //     chartStartX += 12;
+    // }
+
 
 
     //update leaderboard
-    //-----------------------------------------------------------------------------------------------------------------------------------------------------
+    //-------------------------------------------------------------------------------------------------------------
 
 
     currentGameTick++;
@@ -114,8 +189,15 @@ class Agent
     NeuralNetwork brain;
     float dollarsInWallet;
     float coinsInWallet;
+    int totalBuys;
     float dollarsSpent;
+    int totalSells;
     float dollarsHarvested;
+    float totalProfit;
+    ArrayList<TransactionEvent> transactionLog;
+    int evoPoints;
+    
+    
 
     //constructor
     Agent(NeuralNetwork newBrain, float startDollars)
@@ -125,12 +207,17 @@ class Agent
         coinsInWallet = 0;
         dollarsSpent = 0;
         dollarsHarvested = 0;
+        transactionLog = new ArrayList<TransactionEvent>();
+        totalBuys = 0;
+        totalSells = 0;
+        totalProfit = 0;
+        evoPoints = 0;
     }   
 
     //Assess the situation, and use brain to make a decision
     public int updateAI(float[] tickPriceData)
     {
-        //prepare inputs
+        //----[ STEP 1: Prepare inputs ]---------------------------------------------------------♦
         float[] neuralNetInputs = new float[102];
 
         //input #1: available USD to spend
@@ -145,13 +232,116 @@ class Agent
             neuralNetInputs[2+i] = tickPriceData[i];
         }
 
-        //Feed the input array into the brain
+        //----[ STEP 2: Feed the input array into the brain ]─────────────────────────────────────■
+        brain.runNeuralNetwork(neuralNetInputs);
+        float[] outputArray = brain.outputArray;
 
+        //----[ STEP 3: Choose the option with the highest output value ]------------------------♦
+        float highestChoice = 0;
+        int highestChoiceIndex = 0; //0 = wait, 1 = buy, 2 = sell
 
-        //choose the option with the highest output value
-        int decision;//0 = wait, 1 = buy, 2 = sell
+        for(int i = 0; i < brain.outputArray.length; i++)
+        {
+            if(brain.outputArray[i] > highestChoice)
+            {
+                highestChoice = brain.outputArray[i];
+                highestChoiceIndex = i;
+            }
+        }
 
-        return decision;
+        //----[ STEP 4: Carry out decision ]-----------------------------------------------------♦
+        if(highestChoiceIndex == 0) {
+            //waitThisTick++; current price: tickPriceData[0]
+            //Wait. do not buy or sell
+            return 0;
+        } else if(highestChoiceIndex == 1) {
+            //buyThisTick++;
+            boolean buySuccess = buyCoins(tickPriceData[0]);
+            if(buySuccess == true) {
+                //successfully bought coins
+                return 1;
+            } else {
+                //tried to buy but unsuccessful
+                return 11;
+            }
+        } else {
+            //sellThisTick++;
+            boolean sellSuccess = sellCoins(tickPriceData[0]);
+            if(sellSuccess == true) {
+                //successfully sold coins
+                return 2;
+            } else {
+                //tried to sell but not successful
+                return 22;
+            }
+        }
+    }
+
+    public boolean buyCoins(float price)
+    {
+        //check if theres cash to buy
+        if(dollarsInWallet > 0.01f)
+        {
+            //calculate qty of coins to buy
+            float qtyToBuy = dollarsInWallet / price;
+            float usdValue = qtyToBuy * price;
+
+            //adjust Agent balances
+            dollarsInWallet -= usdValue;
+            coinsInWallet += qtyToBuy;
+
+            //create new transaction log entry
+            TransactionEvent transaction = new TransactionEvent("BUY",price,qtyToBuy,usdValue,currentGameTick);
+            transactionLog.add(transaction);
+            totalBuys++;
+            dollarsSpent += usdValue;
+
+            evoPoints++;
+
+            return true;
+        }
+        return false;
+    }
+    public boolean sellCoins(float price)
+    {
+        //check if theres coins to sell
+        if(coinsInWallet > 0.0001f)
+        {
+            float usdValue = coinsInWallet * price;
+
+            //adjust Agent balances
+            dollarsInWallet += usdValue;
+            coinsInWallet = 0;
+
+            //create new transaction log entry
+            TransactionEvent transaction = new TransactionEvent("SELL",price,coinsInWallet,usdValue,currentGameTick);
+            transactionLog.add(transaction);
+            totalSells++;
+            dollarsHarvested += usdValue;
+
+            //calculate total profit
+            totalProfit = dollarsHarvested - dollarsSpent;
+
+            //calculate the total profit of this transaaction
+            float lastUSDspent = transactionLog.get(transactionLog.size()-2).usdValue;
+            float thisProfit = dollarsHarvested - lastUSDspent;
+            evoPoints += 2;
+
+            if(thisProfit > 0) {
+                evoPoints += 10*thisProfit;
+            } else {
+                evoPoints -= 1;
+            }
+
+            return true;
+        }
+        return false;
+    }
+
+    public Agent copy()
+    {
+        Agent copyOfThis = new Agent(brain, 100);
+        return copyOfThis;
     }
 }
 class NeuralNetwork
@@ -559,10 +749,24 @@ class Population
     NeuralNetwork populationBestNeuralNet;
     float bestNeuralNetProfits;
 
+    //keep track of all the buys/sells/waits for all the AIs
+    ArrayList<Integer> totalTickWaits;
+    ArrayList<Integer> totalTickBuys;
+    ArrayList<Integer> totalTickSells;
+    ArrayList<Integer> totalTickBuyFails;
+    ArrayList<Integer> totalTickSellFails;
+
     //constructor
     Population(int amountOfAIs,int[] nnConfig)
     {
         popAmount = amountOfAIs;
+        totalTickWaits = new ArrayList<Integer>();
+        totalTickBuys = new ArrayList<Integer>();
+        totalTickSells = new ArrayList<Integer>();
+        totalTickBuyFails = new ArrayList<Integer>();
+        totalTickSellFails = new ArrayList<Integer>();
+
+        aiPopulation = new Agent[amountOfAIs];
         //generate a bunch of random AIs for this population
         for(int i = 0; i < amountOfAIs; i++)
         {
@@ -578,6 +782,8 @@ class Population
         int waitThisTick = 0;
         int buyThisTick = 0;
         int sellThisTick = 0;
+        int buyThisTickFail = 0;
+        int sellThisTickFail = 0;
         //make each ai decide what to do
         for(int i = 0; i < popAmount; i++) {
             int decision = aiPopulation[i].updateAI(tickPriceData);
@@ -585,14 +791,148 @@ class Population
                 waitThisTick++;
             } else if(decision == 1) {
                 buyThisTick++;
-            } else {
+            } else if(decision == 11) {
+                buyThisTickFail++;
+            } else if(decision == 2) {
                 sellThisTick++;
+            } else {
+                sellThisTickFail++;
             }
         }
+        totalTickWaits.add(waitThisTick);
+        totalTickBuys.add(buyThisTick);
+        totalTickSells.add(sellThisTick);
+        totalTickBuyFails.add(buyThisTickFail);
+        totalTickSellFails.add(sellThisTickFail);
 
         //Now visualize the amount of buys and sells
-        
+        println("Tick: "+currentGameTick+" Waits: "+waitThisTick+" buys: "+buyThisTick+" sells: "+sellThisTick+" Failed buys: "+buyThisTickFail+" Failed sells: "+sellThisTickFail);
+
+        sortPopulation(); 
+        updateLeaderboard();  
     }
+    public void sortPopulation()
+    {
+        //sort by profit. best at index 0
+        boolean arraySorted = false;
+        while(arraySorted == false)
+        {
+            int movedItems = 0;
+            for(int i = 0; i < aiPopulation.length-1; i++)
+            {
+                float firstAIprofit = aiPopulation[i].evoPoints;
+                float secondAIprofit = aiPopulation[i+1].evoPoints;
+
+                if(secondAIprofit > firstAIprofit)
+                {
+                    //switch places    
+                    Agent tempHoldingAI = aiPopulation[i].copy();
+                    aiPopulation[i] = aiPopulation[i+1].copy();
+                    aiPopulation[i+1] = tempHoldingAI.copy();
+
+                    movedItems++;
+                }
+            }
+            if(movedItems == 0) {
+                //we iterated thru the whole array without moving anything, it must be sorted!
+                arraySorted = true;
+            }
+        }
+    }
+    public void updateLeaderboard()
+    {
+        int yPosition = 55;
+
+        for(int i = 0; i < 40; i++)
+        {
+            fill(0);
+            //Index
+            text(i,1305,yPosition);
+
+            //USD spent
+            text(aiPopulation[i].dollarsSpent,1355,yPosition);
+
+            //USD harvest
+            text(aiPopulation[i].dollarsHarvested,1455,yPosition);
+
+            //Profit
+            text(aiPopulation[i].totalProfit,1555,yPosition);
+
+            yPosition+= 20;
+        }
+    }
+
+    public void clense()
+    {
+        //Kill all Agents who have not made any profit 
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    // void drawTransactions()
+    // {
+    //     //draw from left to right
+    //     int startTick = currentGameTick - 99;
+    //     int startAdjustment = 0;
+    //     if(startTick < 0) {
+    //         startAdjustment = 99 - startTick;
+    //     }
+    //     int endTick = currentGameTick;
+
+    //     //each price column is 12px wide
+    //     int xPosition = 0;
+
+    //     //draw the transactions for each tick
+    //     for(int i = 0; i < 100;i++)
+    //     {
+    //         //skip if the start adjustment is active
+    //         if(i >= startAdjustment) {
+    //            int totBuys = totalTickBuys.get(currentGameTick+i-startAdjustment);
+    //             println("totBuys: "+totBuys);
+    //             if( totBuys > 0)
+    //             {
+    //                 fill(255, 148, 25);
+    //                 rect(xPosition+2,400,8,4*totalTickBuys.get(currentGameTick));
+    //             }
+    //             //Sells
+    //             int totSells = totalTickSells.get(currentGameTick+i-startAdjustment);
+    //             if(totSells > 0)
+    //             {
+    //                 fill(31, 242, 116);
+    //                 rect(xPosition+2,400-4*totSells,8,4*totSells);
+    //             } 
+    //         }
+    //         xPosition +=12;
+    //     }
+
+        
+    // }
 }
 class PriceDataSet
 {
@@ -631,6 +971,22 @@ class PriceDataSet
             }
         }
         return tickPriceData;
+    }
+}
+class TransactionEvent
+{
+    String type; //"buy" or "sell"
+    float price; 
+    float qty;
+    float usdValue;
+    int tickOccurred;
+    //constructor
+    TransactionEvent(String _type,float _price,float _qty,float _usdValue,int currentTick) {
+        type = _type;
+        price = _price;
+        qty = _qty;
+        usdValue = _usdValue;
+        tickOccurred = currentTick;
     }
 }
 public float[] generateRandomNN_Multipliers(int amount)
