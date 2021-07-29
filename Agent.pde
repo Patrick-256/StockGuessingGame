@@ -1,6 +1,7 @@
 class Agent
 {
     NeuralNetwork brain;
+    String brain_ID;
     float dollarsInWallet;
     float coinsInWallet;
     int totalBuys;
@@ -10,6 +11,7 @@ class Agent
     float totalProfit;
     ArrayList<TransactionEvent> transactionLog;
     int evoPoints;
+    String nextTransaction;
     
     
 
@@ -26,6 +28,8 @@ class Agent
         totalSells = 0;
         totalProfit = 0;
         evoPoints = 0;
+        brain_ID = brain.sumOfMultipliers+"_"+brain.sumOfBiases;
+        nextTransaction = "BUY";
     }   
 
     //Assess the situation, and use brain to make a decision
@@ -73,9 +77,11 @@ class Agent
             boolean buySuccess = buyCoins(tickPriceData[0]);
             if(buySuccess == true) {
                 //successfully bought coins
+                //println("AI has made decision 1");
                 return 1;
             } else {
                 //tried to buy but unsuccessful
+                //println("AI has made decision 11");
                 return 11;
             }
         } else {
@@ -83,9 +89,11 @@ class Agent
             boolean sellSuccess = sellCoins(tickPriceData[0]);
             if(sellSuccess == true) {
                 //successfully sold coins
+                //println("AI has made decision 2");
                 return 2;
             } else {
                 //tried to sell but not successful
+                //println("AI has made decision 22");
                 return 22;
             }
         }
@@ -94,23 +102,27 @@ class Agent
     boolean buyCoins(float price)
     {
         //check if theres cash to buy
-        if(dollarsInWallet > 0.01)
+        if(dollarsInWallet > 1 && nextTransaction == "BUY")
         {
+            //println("AI "+brain_ID+" buy - Dollars in wallet: "+dollarsInWallet+" nextTransaction: "+nextTransaction);
+            totalBuys++;
             //calculate qty of coins to buy
             float qtyToBuy = dollarsInWallet / price;
-            float usdValue = qtyToBuy * price;
-
-            //adjust Agent balances
-            dollarsInWallet -= usdValue;
-            coinsInWallet += qtyToBuy;
 
             //create new transaction log entry
-            TransactionEvent transaction = new TransactionEvent("BUY",price,qtyToBuy,usdValue,currentGameTick);
+            TransactionEvent transaction = new TransactionEvent("BUY",price,qtyToBuy,dollarsInWallet,currentGameTick);
             transactionLog.add(transaction);
-            totalBuys++;
-            dollarsSpent += usdValue;
+            
+            dollarsSpent += dollarsInWallet;
+
+            //adjust Agent balances
+            dollarsInWallet = 0;
+            coinsInWallet += qtyToBuy;
 
             evoPoints++;
+            nextTransaction = "SELL";
+
+            //println("AI "+brain_ID+" buyCompleted - Dollars in wallet: "+dollarsInWallet+" nextTransaction: "+nextTransaction);
 
             return true;
         }
@@ -119,18 +131,16 @@ class Agent
     boolean sellCoins(float price)
     {
         //check if theres coins to sell
-        if(coinsInWallet > 0.001)
+        if(coinsInWallet > 1 && nextTransaction == "SELL")
         {
+            //println("AI "+brain_ID+" sell - Dollars in wallet: "+dollarsInWallet+" nextTransaction: "+nextTransaction);
+            totalSells++;
             float usdValue = coinsInWallet * price;
-
-            //adjust Agent balances
-            dollarsInWallet += usdValue;
-            coinsInWallet = 0;
 
             //create new transaction log entry
             TransactionEvent transaction = new TransactionEvent("SELL",price,coinsInWallet,usdValue,currentGameTick);
             transactionLog.add(transaction);
-            totalSells++;
+            
             dollarsHarvested += usdValue;
 
             //calculate total profit
@@ -141,11 +151,18 @@ class Agent
             float thisProfit = dollarsHarvested - lastUSDspent;
             evoPoints += 2;
 
+            //adjust Agent balances
+            dollarsInWallet += usdValue;
+            coinsInWallet = 0;
+
             if(thisProfit > 0) {
                 evoPoints += 10*thisProfit;
             } else {
                 evoPoints -= 1;
             }
+            nextTransaction = "BUY";
+
+            //println("AI "+brain_ID+" sellCompleted - Dollars in wallet: "+dollarsInWallet+" nextTransaction: "+nextTransaction);
 
             return true;
         }
@@ -155,6 +172,19 @@ class Agent
     Agent copy()
     {
         Agent copyOfThis = new Agent(brain, 100);
+        copyOfThis.dollarsInWallet = dollarsInWallet;
+        copyOfThis.coinsInWallet = coinsInWallet;
+        copyOfThis.totalBuys = totalBuys;
+        copyOfThis.dollarsSpent = dollarsSpent;
+        copyOfThis.totalSells = totalSells;
+        copyOfThis.dollarsHarvested = dollarsHarvested;
+        copyOfThis.evoPoints = evoPoints;
+        copyOfThis.nextTransaction = nextTransaction;
+        copyOfThis.transactionLog = new ArrayList<TransactionEvent>();
+        for(int i = 0; i < transactionLog.size(); i++)
+        {
+            copyOfThis.transactionLog.add(transactionLog.get(i).copy());
+        }
         return copyOfThis;
     }
 }

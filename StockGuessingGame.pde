@@ -24,7 +24,7 @@ void setup() {
     aiPopulation = new Population(1000,testNNconfig);
 
     frameRate(60);
-    size(1700,900);
+    size(1750,900);
     background(100);
 }
 
@@ -53,13 +53,13 @@ void draw() {
     line(1300,35,1650,35);
     line(1300,15,1300,850);
     text("Index",1305,30);
-    line(1350,15,1350,850);
-    text("USD Spent",1355,30);
-    line(1450,15,1450,850);
-    text("USD Harvest",1455,30);
-    line(1550,15,1550,850);
-    text("Profit",1555,30);
-    line(1650,15,1650,850);
+    line(1480,15,1480,850);
+    text("USD Spent",1485,30);
+    line(1580,15,1580,850);
+    text("USD Harvest",1585,30);
+    line(1680,15,1680,850);
+    text("Profit",1685,30);
+    line(1750,15,1750,850);
 
     //draw each individual price element. First find high and low prices
     float highPrice = 0;
@@ -165,6 +165,15 @@ void draw() {
     //update leaderboard
     //-------------------------------------------------------------------------------------------------------------
 
+    if(currentGameTick == 10000)
+    {
+        //its time to assess this generation's champions and generate new AIs
 
-    currentGameTick++;
+
+        currentGameTick = 0;
+    } else {
+        //continue simulating current generation
+        currentGameTick++;
+    }
+    
 }

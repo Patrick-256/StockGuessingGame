@@ -54,6 +54,9 @@ class Population
             } else {
                 sellThisTickFail++;
             }
+
+            //print what each AI decides to do every tick
+            //println("AI "+aiPopulation[i].brain_ID+" has made decision "+decision+" ; TotBuys: "+aiPopulation[i].totalBuys+" ; TotSells: "+aiPopulation[i].totalSells+" ; TotTransactions: "+aiPopulation[i].transactionLog.size());
         }
         totalTickWaits.add(waitThisTick);
         totalTickBuys.add(buyThisTick);
@@ -62,6 +65,7 @@ class Population
         totalTickSellFails.add(sellThisTickFail);
 
         //Now visualize the amount of buys and sells
+        //println("-------------------------------------------------------------------------------------------------");
         println("Tick: "+currentGameTick+" Waits: "+waitThisTick+" buys: "+buyThisTick+" sells: "+sellThisTick+" Failed buys: "+buyThisTickFail+" Failed sells: "+sellThisTickFail);
 
         sortPopulation(); 
@@ -76,8 +80,8 @@ class Population
             int movedItems = 0;
             for(int i = 0; i < aiPopulation.length-1; i++)
             {
-                float firstAIprofit = aiPopulation[i].evoPoints;
-                float secondAIprofit = aiPopulation[i+1].evoPoints;
+                float firstAIprofit = aiPopulation[i].dollarsSpent;
+                float secondAIprofit = aiPopulation[i+1].dollarsSpent;
 
                 if(secondAIprofit > firstAIprofit)
                 {
@@ -103,16 +107,16 @@ class Population
         {
             fill(0);
             //Index
-            text(i,1305,yPosition);
+            text(aiPopulation[i].brain_ID,1305,yPosition);
 
             //USD spent
-            text(aiPopulation[i].dollarsSpent,1355,yPosition);
+            text(aiPopulation[i].dollarsSpent,1485,yPosition);
 
             //USD harvest
-            text(aiPopulation[i].dollarsHarvested,1455,yPosition);
+            text(aiPopulation[i].dollarsHarvested,1585,yPosition);
 
             //Profit
-            text(aiPopulation[i].totalProfit,1555,yPosition);
+            text(aiPopulation[i].totalProfit,1685,yPosition);
 
             yPosition+= 20;
         }

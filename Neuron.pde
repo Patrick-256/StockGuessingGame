@@ -5,6 +5,8 @@ class NeuralNetwork
     int[] nnConfig;
     float[] nnMultipliers;
     float[] nnBiases;
+    float sumOfMultipliers; //used for ID purposes
+    float sumOfBiases; //used for ID purposes
 
     //constructor - build a new neural network
     NeuralNetwork(int[] nueralNetLayerConfig, float[] neuralNetMultipliers, float[] neuralNetBiases)
@@ -43,11 +45,15 @@ class NeuralNetwork
 
                     connection = new neuronInput(cLayer,c,neuralNetMultipliers[connectionID]);
                     neuronInputs[c] = connection;
+
+                    sumOfMultipliers += neuralNetMultipliers[connectionID];
                     connectionID++;
                 }
                 //now create the neuron with the array of inputs and the bias
                 neuron = new Neuron(neuronInputs,neuralNetBiases[neuronID]);
                 neuralNetLayer[n] = neuron;
+
+                sumOfBiases += neuralNetBiases[neuronID];
                 neuronID++;
             }
             neuralNetwork[l] = new NeuralNetLayer(neuralNetLayer);

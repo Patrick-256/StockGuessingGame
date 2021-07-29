@@ -69,13 +69,13 @@ public void draw() {
     line(1300,35,1650,35);
     line(1300,15,1300,850);
     text("Index",1305,30);
-    line(1350,15,1350,850);
-    text("USD Spent",1355,30);
-    line(1450,15,1450,850);
-    text("USD Harvest",1455,30);
-    line(1550,15,1550,850);
-    text("Profit",1555,30);
-    line(1650,15,1650,850);
+    line(1480,15,1480,850);
+    text("USD Spent",1485,30);
+    line(1580,15,1580,850);
+    text("USD Harvest",1585,30);
+    line(1680,15,1680,850);
+    text("Profit",1685,30);
+    line(1750,15,1750,850);
 
     //draw each individual price element. First find high and low prices
     float highPrice = 0;
@@ -181,12 +181,22 @@ public void draw() {
     //update leaderboard
     //-------------------------------------------------------------------------------------------------------------
 
+    if(currentGameTick == 10000)
+    {
+        //its time to assess this generation's champions and generate new AIs
 
-    currentGameTick++;
+
+        currentGameTick = 0;
+    } else {
+        //continue simulating current generation
+        currentGameTick++;
+    }
+    
 }
 class Agent
 {
     NeuralNetwork brain;
+    String brain_ID;
     float dollarsInWallet;
     float coinsInWallet;
     int totalBuys;
@@ -196,6 +206,7 @@ class Agent
     float totalProfit;
     ArrayList<TransactionEvent> transactionLog;
     int evoPoints;
+    String nextTransaction;
     
     
 
@@ -212,6 +223,8 @@ class Agent
         totalSells = 0;
         totalProfit = 0;
         evoPoints = 0;
+        brain_ID = brain.sumOfMultipliers+"_"+brain.sumOfBiases;
+        nextTransaction = "BUY";
     }   
 
     //Assess the situation, and use brain to make a decision
@@ -259,9 +272,11 @@ class Agent
             boolean buySuccess = buyCoins(tickPriceData[0]);
             if(buySuccess == true) {
                 //successfully bought coins
+                //println("AI has made decision 1");
                 return 1;
             } else {
                 //tried to buy but unsuccessful
+                //println("AI has made decision 11");
                 return 11;
             }
         } else {
@@ -269,9 +284,11 @@ class Agent
             boolean sellSuccess = sellCoins(tickPriceData[0]);
             if(sellSuccess == true) {
                 //successfully sold coins
+                //println("AI has made decision 2");
                 return 2;
             } else {
                 //tried to sell but not successful
+                //println("AI has made decision 22");
                 return 22;
             }
         }
@@ -280,23 +297,27 @@ class Agent
     public boolean buyCoins(float price)
     {
         //check if theres cash to buy
-        if(dollarsInWallet > 0.01f)
+        if(dollarsInWallet > 1 && nextTransaction == "BUY")
         {
+            //println("AI "+brain_ID+" buy - Dollars in wallet: "+dollarsInWallet+" nextTransaction: "+nextTransaction);
+            totalBuys++;
             //calculate qty of coins to buy
             float qtyToBuy = dollarsInWallet / price;
-            float usdValue = qtyToBuy * price;
-
-            //adjust Agent balances
-            dollarsInWallet -= usdValue;
-            coinsInWallet += qtyToBuy;
 
             //create new transaction log entry
-            TransactionEvent transaction = new TransactionEvent("BUY",price,qtyToBuy,usdValue,currentGameTick);
+            TransactionEvent transaction = new TransactionEvent("BUY",price,qtyToBuy,dollarsInWallet,currentGameTick);
             transactionLog.add(transaction);
-            totalBuys++;
-            dollarsSpent += usdValue;
+            
+            dollarsSpent += dollarsInWallet;
+
+            //adjust Agent balances
+            dollarsInWallet = 0;
+            coinsInWallet += qtyToBuy;
 
             evoPoints++;
+            nextTransaction = "SELL";
+
+            //println("AI "+brain_ID+" buyCompleted - Dollars in wallet: "+dollarsInWallet+" nextTransaction: "+nextTransaction);
 
             return true;
         }
@@ -305,18 +326,16 @@ class Agent
     public boolean sellCoins(float price)
     {
         //check if theres coins to sell
-        if(coinsInWallet > 0.0001f)
+        if(coinsInWallet > 1 && nextTransaction == "SELL")
         {
+            //println("AI "+brain_ID+" sell - Dollars in wallet: "+dollarsInWallet+" nextTransaction: "+nextTransaction);
+            totalSells++;
             float usdValue = coinsInWallet * price;
-
-            //adjust Agent balances
-            dollarsInWallet += usdValue;
-            coinsInWallet = 0;
 
             //create new transaction log entry
             TransactionEvent transaction = new TransactionEvent("SELL",price,coinsInWallet,usdValue,currentGameTick);
             transactionLog.add(transaction);
-            totalSells++;
+            
             dollarsHarvested += usdValue;
 
             //calculate total profit
@@ -327,11 +346,18 @@ class Agent
             float thisProfit = dollarsHarvested - lastUSDspent;
             evoPoints += 2;
 
+            //adjust Agent balances
+            dollarsInWallet += usdValue;
+            coinsInWallet = 0;
+
             if(thisProfit > 0) {
                 evoPoints += 10*thisProfit;
             } else {
                 evoPoints -= 1;
             }
+            nextTransaction = "BUY";
+
+            //println("AI "+brain_ID+" sellCompleted - Dollars in wallet: "+dollarsInWallet+" nextTransaction: "+nextTransaction);
 
             return true;
         }
@@ -341,6 +367,19 @@ class Agent
     public Agent copy()
     {
         Agent copyOfThis = new Agent(brain, 100);
+        copyOfThis.dollarsInWallet = dollarsInWallet;
+        copyOfThis.coinsInWallet = coinsInWallet;
+        copyOfThis.totalBuys = totalBuys;
+        copyOfThis.dollarsSpent = dollarsSpent;
+        copyOfThis.totalSells = totalSells;
+        copyOfThis.dollarsHarvested = dollarsHarvested;
+        copyOfThis.evoPoints = evoPoints;
+        copyOfThis.nextTransaction = nextTransaction;
+        copyOfThis.transactionLog = new ArrayList<TransactionEvent>();
+        for(int i = 0; i < transactionLog.size(); i++)
+        {
+            copyOfThis.transactionLog.add(transactionLog.get(i).copy());
+        }
         return copyOfThis;
     }
 }
@@ -351,6 +390,8 @@ class NeuralNetwork
     int[] nnConfig;
     float[] nnMultipliers;
     float[] nnBiases;
+    float sumOfMultipliers; //used for ID purposes
+    float sumOfBiases; //used for ID purposes
 
     //constructor - build a new neural network
     NeuralNetwork(int[] nueralNetLayerConfig, float[] neuralNetMultipliers, float[] neuralNetBiases)
@@ -389,11 +430,15 @@ class NeuralNetwork
 
                     connection = new neuronInput(cLayer,c,neuralNetMultipliers[connectionID]);
                     neuronInputs[c] = connection;
+
+                    sumOfMultipliers += neuralNetMultipliers[connectionID];
                     connectionID++;
                 }
                 //now create the neuron with the array of inputs and the bias
                 neuron = new Neuron(neuronInputs,neuralNetBiases[neuronID]);
                 neuralNetLayer[n] = neuron;
+
+                sumOfBiases += neuralNetBiases[neuronID];
                 neuronID++;
             }
             neuralNetwork[l] = new NeuralNetLayer(neuralNetLayer);
@@ -798,6 +843,9 @@ class Population
             } else {
                 sellThisTickFail++;
             }
+
+            //print what each AI decides to do every tick
+            //println("AI "+aiPopulation[i].brain_ID+" has made decision "+decision+" ; TotBuys: "+aiPopulation[i].totalBuys+" ; TotSells: "+aiPopulation[i].totalSells+" ; TotTransactions: "+aiPopulation[i].transactionLog.size());
         }
         totalTickWaits.add(waitThisTick);
         totalTickBuys.add(buyThisTick);
@@ -806,6 +854,7 @@ class Population
         totalTickSellFails.add(sellThisTickFail);
 
         //Now visualize the amount of buys and sells
+        //println("-------------------------------------------------------------------------------------------------");
         println("Tick: "+currentGameTick+" Waits: "+waitThisTick+" buys: "+buyThisTick+" sells: "+sellThisTick+" Failed buys: "+buyThisTickFail+" Failed sells: "+sellThisTickFail);
 
         sortPopulation(); 
@@ -820,8 +869,8 @@ class Population
             int movedItems = 0;
             for(int i = 0; i < aiPopulation.length-1; i++)
             {
-                float firstAIprofit = aiPopulation[i].evoPoints;
-                float secondAIprofit = aiPopulation[i+1].evoPoints;
+                float firstAIprofit = aiPopulation[i].dollarsSpent;
+                float secondAIprofit = aiPopulation[i+1].dollarsSpent;
 
                 if(secondAIprofit > firstAIprofit)
                 {
@@ -847,16 +896,16 @@ class Population
         {
             fill(0);
             //Index
-            text(i,1305,yPosition);
+            text(aiPopulation[i].brain_ID,1305,yPosition);
 
             //USD spent
-            text(aiPopulation[i].dollarsSpent,1355,yPosition);
+            text(aiPopulation[i].dollarsSpent,1485,yPosition);
 
             //USD harvest
-            text(aiPopulation[i].dollarsHarvested,1455,yPosition);
+            text(aiPopulation[i].dollarsHarvested,1585,yPosition);
 
             //Profit
-            text(aiPopulation[i].totalProfit,1555,yPosition);
+            text(aiPopulation[i].totalProfit,1685,yPosition);
 
             yPosition+= 20;
         }
@@ -988,6 +1037,12 @@ class TransactionEvent
         usdValue = _usdValue;
         tickOccurred = currentTick;
     }
+
+    public TransactionEvent copy()
+    {
+        TransactionEvent copyOfThis = new TransactionEvent(type,price,qty,usdValue,tickOccurred);
+        return copyOfThis;
+    }
 }
 public float[] generateRandomNN_Multipliers(int amount)
 {
@@ -1118,7 +1173,7 @@ public NeuralNetwork mutateNeuralNetworkV2(NeuralNetwork neuralNetwork,float ste
     }
     return neuralNetwork;
 }
-  public void settings() {  size(1700,900); }
+  public void settings() {  size(1750,900); }
   static public void main(String[] passedArgs) {
     String[] appletArgs = new String[] { "StockGuessingGame" };
     if (passedArgs != null) {

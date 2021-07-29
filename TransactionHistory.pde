@@ -13,4 +13,10 @@ class TransactionEvent
         usdValue = _usdValue;
         tickOccurred = currentTick;
     }
+
+    TransactionEvent copy()
+    {
+        TransactionEvent copyOfThis = new TransactionEvent(type,price,qty,usdValue,tickOccurred);
+        return copyOfThis;
+    }
 }
